@@ -93,7 +93,7 @@ Automatic emails for
 
 Built using **Nodemailer SMTP**.
 
----
+----
 
 ## 📅 Google Calendar Integration
 
