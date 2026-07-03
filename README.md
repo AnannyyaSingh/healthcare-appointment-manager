@@ -13,207 +13,276 @@ This is a comprehensive, production-ready healthcare management application buil
 6. [Design & Architecture Overview](#design--architecture-overview)
 
 ---
+# 🏥 Healthcare Appointment & Follow-up Manager
 
-## Setup Guide
+> An AI-powered healthcare appointment management platform that streamlines appointment booking, doctor scheduling, AI-assisted symptom analysis, post-visit summaries, medication reminders, email notifications, and Google Calendar integration.
 
-### Prerequisites
-- **Node.js** (v18 or higher recommended)
-- **NPM** (v9 or higher)
-
-### Installation
-1. Clone or extract the project zip file.
-2. Open a terminal in the root directory `healthcare-manager` and install all workspace dependencies:
-   ```bash
-   # Installs concurrently in root, and runs sub-installations in backend/ and frontend/
-   npm install
-   npm run install:all
-   ```
-
-### Configuration
-1. Navigate to the `backend/` directory and create a `.env` file based on `.env.example`:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-2. Configure your environment keys:
-   - **GEMINI_API_KEY**: Get a free API key from [Google AI Studio](https://aistudio.google.com/). If left blank, the system automatically falls back to local rule-based summary generation.
-   - **SMTP_HOST / USER / PASS**: Email SMTP parameters. If left blank, all sent emails will log as clean JSON entries inside `backend/logs/email_log.json` rather than failing.
-   - **GOOGLE_CLIENT_ID / SECRET / REFRESH_TOKEN**: For Google Calendar integrations. If left blank, all events will mock-log to `backend/logs/calendar_log.json`.
-
-### Seed and Run
-1. Run the database seed script to initialize default credentials:
-   ```bash
-   npm run seed --prefix backend
-   ```
-2. Start both the backend and frontend development servers concurrently:
-   ```bash
-   npm run dev
-   ```
-3. Default Test Login Portals:
-   - **Admin Portal**: `admin@clinic.com` / `admin123`
-   - **Doctor Portal**: `doctor1@clinic.com` / `doctor123`
-   - **Patient Portal**: `patient@example.com` / `patient123`
-   - **Frontend App**: Spawns at `http://localhost:5173/`
-   - **Backend API**: Spawns at `http://localhost:5000/`
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Node.js](https://img.shields.io/badge/Backend-Node.js-green)
+![React](https://img.shields.io/badge/Frontend-React-61DAFB)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248)
+![OpenAI](https://img.shields.io/badge/AI-LLM-orange)
 
 ---
 
-## Database Schema
+The platform simplifies appointment scheduling while leveraging Large Language Models (LLMs) to generate AI-powered symptom summaries before consultations and patient-friendly visit summaries afterward. It also automates medication reminders, email notifications, and Google Calendar synchronization.
 
-The database uses SQLite, containing 7 integrated tables:
+---
 
-```sql
--- 1. Users list (role-based auth)
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('patient', 'doctor', 'admin')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
-);
+# ✨ Features
 
--- 2. Doctor profile specifications
-CREATE TABLE doctor_profiles (
-  id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  specialisation TEXT NOT NULL,
-  slot_duration INTEGER NOT NULL DEFAULT 30,
-  working_start TEXT NOT NULL DEFAULT '09:00',
-  working_end TEXT NOT NULL DEFAULT '17:00'
-);
+## 👨‍⚕️ Admin Portal
 
--- 3. Doctor leave days
-CREATE TABLE doctor_leaves (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  doctor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  leave_date TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-  UNIQUE(doctor_id, leave_date)
-);
+- Create, edit, and remove doctor profiles
+- Manage doctor specializations
+- Configure working hours
+- Configure slot duration
+- Mark doctor leave dates
+- Automatically notify affected patients
+- Dashboard with appointment analytics
 
--- 4. Booked and completed appointments
-CREATE TABLE appointments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  doctor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  appointment_date TEXT NOT NULL,
-  appointment_time TEXT NOT NULL,
-  status TEXT NOT NULL CHECK(status IN ('booked', 'cancelled', 'completed')) DEFAULT 'booked',
-  symptoms TEXT,
-  urgency_level TEXT CHECK(urgency_level IN ('Low', 'Medium', 'High')),
-  pre_visit_summary TEXT, -- JSON String: chief complaint, suggested questions, raw summary
-  post_visit_notes TEXT,
-  prescription TEXT,
-  post_visit_summary TEXT, -- Patient-friendly AI Care plan
-  calendar_event_id TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
-);
+---
 
--- 5. Active temporary slot holds (5 minutes limit)
-CREATE TABLE slot_holds (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  doctor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  date TEXT NOT NULL,
-  time TEXT NOT NULL,
-  held_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  expires_at INTEGER NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-  UNIQUE(doctor_id, date, time)
-);
+## 🩺 Doctor Portal
 
--- 6. Email Queue for background delivery and retry logs
-CREATE TABLE email_queue (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  to_email TEXT NOT NULL,
-  subject TEXT NOT NULL,
-  body TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'failed', 'sent')),
-  retry_count INTEGER NOT NULL DEFAULT 0,
-  error_message TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
-);
+- Secure authentication
+- View daily appointments
+- Read AI-generated symptom summaries
+- Access patient history
+- Submit consultation notes
+- Upload prescriptions
+- Generate AI-powered patient summaries
+- Manage availability
 
--- 7. Recurring medication reminders
-CREATE TABLE reminders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
-  medication_name TEXT NOT NULL,
-  frequency TEXT NOT NULL,
-  next_run_at TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'sent', 'cancelled'))
-);
+---
+
+## 👤 Patient Portal
+
+- User Registration & Login
+- Search doctors by specialization
+- View available appointment slots
+- Book appointments
+- Fill symptom questionnaire
+- View appointment history
+- Receive reminders
+- Access post-visit summaries
+
+
+### Post-Visit Summary
+
+Doctors submit clinical notes.
+
+The AI converts them into patient-friendly language including:
+
+- Diagnosis
+- Medication Schedule
+- Lifestyle Advice
+- Follow-up Instructions
+
+Example Prompt:
+
+```
+Convert these clinical notes into a patient-friendly summary with medication schedule and follow-up steps.
 ```
 
 ---
 
-## API Documentation
+## 📧 Email Notifications
 
-### Auth Portal
-- `POST /api/auth/register` : Public register (role: `patient` or `doctor`).
-- `POST /api/auth/login` : Login user, returns JWT and user metadata.
-- `GET /api/auth/me` : Validate token and fetch profile.
+Automatic emails for
 
-### Patient Portal
-- `GET /api/patient/doctors` : List doctors. Accepts `specialisation` and `search` filters.
-- `GET /api/patient/doctors/:id/slots?date=YYYY-MM-DD` : List slots, labeled as `available`, `booked`, `held`, or `held_by_me`.
-- `POST /api/patient/slots/hold` : Request a 5-minute hold on a slot.
-- `POST /api/patient/appointments` : Confirm booking. Submits symptoms, generates LLM summaries, creates calendar event, logs confirmation emails.
-- `GET /api/patient/appointments` : List all logged patient appointments and prescriptions.
+- Appointment Confirmation
+- Appointment Cancellation
+- Appointment Reminder
+- Medication Reminder
+- Doctor Leave Notification
 
-### Doctor Portal
-- `GET /api/doctor/appointments` : Retrieve scheduled doctor appointments, including symptoms and AI pre-visit summaries.
-- `POST /api/doctor/appointments/:id/complete` : Log clinical notes, issue prescriptions, initialize medication reminders, generate AI care plans.
-
-### Admin Portal
-- `GET /api/admin/doctors` : Retrieve all registered doctors, hours, and leaves.
-- `POST /api/admin/doctors` : Register a doctor.
-- `PUT /api/admin/doctors/:id` : Update working hours, slot duration, specialisation.
-- `DELETE /api/admin/doctors/:id` : Remove doctor, cancel future appointments, queue alert notices.
-- `POST /api/admin/doctors/:id/leaves` : Register leave. Detects booking overlaps. Pass `resolveConflicts: true` to auto-cancel bookings and dispatch alert emails.
-- `DELETE /api/admin/doctors/:id/leaves/:date` : Remove a scheduled leave.
+Built using **Nodemailer SMTP**.
 
 ---
 
-## LLM Integration & Prompts
+## 📅 Google Calendar Integration
 
-The system utilizes Gemini API for two critical tasks, using structured parsing to isolate JSON outputs:
+Automatically:
 
-### 1. Pre-visit Symptoms Summary
-- **Prompt**:
-  `Analyse these symptoms and return: urgency level (Low / Medium / High), chief complaint, and three suggested questions for the doctor. Symptoms: <symptoms>`
-- **Structured Schema Requested**:
-  ```json
-  {
-    "urgency_level": "Low" | "Medium" | "High",
-    "chief_complaint": "Brief chief complaint text",
-    "suggested_questions": ["Question 1", "Question 2", "Question 3"],
-    "raw_summary": "Full overview text"
-  }
-  ```
-
-### 2. Post-visit Patient Plan
-- **Prompt**:
-  `Convert these clinical notes into a patient-friendly summary with medication schedule and follow-up steps: <notes>`
+- Create appointment events
+- Update events on reschedule
+- Delete events on cancellation
+- Invite both doctor and patient
 
 ---
 
-## Google Calendar OAuth 2.0 Setup
+## 🔒 Authentication
 
-Follow these steps to generate production Google Calendar credentials:
+Role-Based Authentication
 
-1. **Create Google Cloud Project**:
-   Go to the [Google Cloud Console](https://console.cloud.google.com/), log in, and create a new project.
-2. **Enable Calendar API**:
-   Search for "Google Calendar API" in the library search bar, and click **Enable**.
-3. **Configure OAuth Consent Screen**:
-   - Navigate to **APIs & Services > OAuth consent screen**.
-   - Select **External** type, register your application details, and add your test email as a developer.
-   - Under scopes, add `.../auth/calendar` and `.../auth/calendar.events`.
-4. **Generate Credentials**:
-   - Navigate to **APIs & Services > Credentials**.
-   - Click **Create Credentials > OAuth client ID**.
-   - Select **Web Application** type.
-   - Set **Authorized Redirect URIs** to: `http://localhost:5000/api/auth/google/callback` (or your staging domain).
-   - Copy the generated `Client ID` and `Client Secret` to your `.env` file.
-5. **Acquire Refresh Token**:
-   Since the app runs as a service backend, you need a long-lived `Refresh Token` to query calendars without user-facing logins. You can obtain this using Google OAuth playground or by exposing a temporary auth route:
-   - Navigate to Google OAuth Playground, authorize the Calendar scopes, select your client ID/secret, click authorize, and copy the generated `Refresh Token` to your `.env` file.
+- Patient
+- Doctor
+- Admin
+
+JWT Authentication
+
+Password Hashing using bcrypt
+
+Protected Routes
+
+---
+
+## ⚡ Double Booking Prevention
+
+The system prevents multiple patients from booking the same slot by:
+
+- Database Transactions
+- Atomic Updates
+- Slot Lock Mechanism
+- Appointment Status Validation
+
+---
+
+## 🔄 Background Jobs
+
+Automated background workers handle:
+
+- Medication reminders
+- Appointment reminders
+- Email retries
+- Calendar synchronization
+
+---
+
+# 🛠 Tech Stack
+
+## Frontend
+
+- React.js
+- Tailwind CSS
+- Axios
+- React Router
+
+---
+
+## Backend
+
+- Node.js
+- Express.js
+- JWT Authentication
+- Nodemailer
+- Google Calendar API
+- OpenAI API
+
+---
+
+## Database
+
+- MongoDB
+- Mongoose
+
+---
+
+# 📂 Project Structure
+
+```
+Healthcare-Appointment-Manager
+│
+├── backend
+│   ├── config
+│   ├── controllers
+│   ├── middleware
+│   ├── models
+│   ├── routes
+│   ├── services
+│   ├── jobs
+│   ├── utils
+│   └── server.js
+│
+├── frontend
+│   ├── public
+│   ├── src
+│   │   ├── pages
+│   │   ├── components
+│   │   ├── context
+│   │   ├── services
+│   │   └── App.jsx
+│
+└── README.md
+```
+
+---
+
+# 🗄 Database Schema
+
+### User
+
+- Name
+- Email
+- Password
+- Role
+
+---
+
+### Doctor
+
+- Specialization
+- Experience
+- Working Hours
+- Slot Duration
+- Leave Dates
+
+---
+
+### Appointment
+
+- Patient
+- Doctor
+- Date
+- Time
+- Symptoms
+- AI Summary
+- Status
+
+---
+
+### Prescription
+
+- Medicines
+- Dosage
+- Frequency
+- Notes
+
+# 📖 System Design Highlights
+
+✅ Role-Based Authentication
+
+✅ AI-assisted Healthcare Workflow
+
+✅ Atomic Appointment Booking
+
+✅ Doctor Leave Conflict Resolution
+
+✅ Queue-based Notification System
+
+✅ Email Retry Mechanism
+
+✅ Google Calendar Synchronization
+
+✅ Background Job Scheduling
+
+---
+
+# 👨‍💻 Author
+
+**Anannya Singh**
+
+Computer Science Engineering Student
+
+Python • C++ • JavaScript • React • Node.js • AI • Machine Learning
+
+LinkedIn: https://www.linkedin.com/in/anannya-singh-5aa6b1337/
+
+GitHub: https://github.com/AnannyyaSingh
+
+---
+
+# ⭐ If you found this project useful
+
+Please consider giving it a **⭐ Star**.
