@@ -79,12 +79,6 @@ The AI converts them into patient-friendly language including:
 - Lifestyle Advice
 - Follow-up Instructions
 
-Example Prompt:
-
-```
-Convert these clinical notes into a patient-friendly summary with medication schedule and follow-up steps.
-```
-
 ---
 
 ## 📧 Email Notifications
